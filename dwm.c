@@ -21,6 +21,9 @@
  * To understand everything else, start reading main().
  */
 #include <errno.h>
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
 #include <locale.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -1019,6 +1022,26 @@ killclient(const Arg *arg)
 		XSetErrorHandler(xerror);
 		XUngrabServer(dpy);
 	}
+}
+
+void
+loadlua()
+{
+	char filepath[256];
+	lua_State *L;
+
+	snprintf(filepath, sizeof(filepath),
+			"%s/.config/dwm/config.lua", getenv("HOME"));
+
+	L = luaL_newstate();
+	if (luaL_loadfile(L, filepath) || lua_pcall(L, 0, 0, 0))
+		die("cannot run configuration file: %s",
+				lua_tostring(L, -1));
+
+	lua_getglobal(L, "borderpx");
+	borderpx = (unsigned int)lua_tonumber(L, -1);
+
+	lua_close(L);
 }
 
 void
@@ -2146,6 +2169,7 @@ main(int argc, char *argv[])
 	if (!(dpy = XOpenDisplay(NULL)))
 		die("dwm: cannot open display");
 	checkotherwm();
+	loadlua();
 	setup();
 #ifdef __OpenBSD__
 	if (pledge("stdio rpath proc exec", NULL) == -1)
